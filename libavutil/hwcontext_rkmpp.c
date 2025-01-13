@@ -42,7 +42,7 @@ static const struct {
     uint32_t drm_format;
 } supported_formats[] = {
     /* grayscale */
-    { AV_PIX_FMT_GRAY8,     DRM_FORMAT_R8        },
+    { AV_PIX_FMT_GRAY8,     DRM_FORMAT_R8,       },
     /* fully-planar YUV */
     { AV_PIX_FMT_YUV420P,   DRM_FORMAT_YUV420,   },
     { AV_PIX_FMT_YUV422P,   DRM_FORMAT_YUV422,   },
@@ -172,8 +172,7 @@ static int rkmpp_get_aligned_linesize(enum AVPixelFormat pix_fmt, int width, int
 
     if (pix_fmt == AV_PIX_FMT_NV15 ||
         pix_fmt == AV_PIX_FMT_NV20) {
-        const int log2_chroma_w = plane == 1 ? 1 : 0;
-        const int width_align_256_odds = FFALIGN(width << log2_chroma_w, 256) | 256;
+        const int width_align_256_odds = FFALIGN(width, 256) | 256;
         return FFALIGN(width_align_256_odds * 10 / 8, 64);
     }
 
@@ -183,7 +182,7 @@ static int rkmpp_get_aligned_linesize(enum AVPixelFormat pix_fmt, int width, int
         const int pixel_width = av_get_padded_bits_per_pixel(pixdesc) / 8;
         linesize = FFALIGN(linesize / pixel_width, 8) * pixel_width;
     } else if (is_yuv && is_fully_planar) {
-        linesize = FFALIGN(linesize, 8);
+        linesize = FFALIGN(linesize, 16 >> (plane ? pixdesc->log2_chroma_w : 0));
     } else
         linesize = FFALIGN(linesize, 64);
 
@@ -458,6 +457,7 @@ static int rkmpp_map_frame(AVHWFramesContext *hwfc,
 
     dst->width  = src->width;
     dst->height = src->height;
+    dst->hw_frames_ctx = NULL;
 
     err = ff_hwframe_map_create(src->hw_frames_ctx, dst, src,
                                 &rkmpp_unmap_frame, map);
